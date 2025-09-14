@@ -1,0 +1,5 @@
+final_value: 1411.059793
+total_trades: 42
+max_drawdown: -26.931%
+volatility: 0.069497
+sharpe: 0.284466
