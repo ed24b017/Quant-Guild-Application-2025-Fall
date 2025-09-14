@@ -85,22 +85,15 @@ def main() -> None:
 
     close_cols = df_sel.columns[1:]
     
-    lookbacks = range(int(len(df)/50), int(len(df)/10), int(len(df)/40))
+    lookbacks = range(int(len(df)/50), int(len(df)/10), int(len(df)/20))
     
     returns_dict = {}  
-    
     for lookback in lookbacks:
-        
         df_rets = pd.DataFrame(index=df_sel.index)
-        
         for col in close_cols:
-            
             df_rets[f'{col}'] = ((df_sel[col] - df_sel[col].shift(lookback)) / df_sel[col].shift(lookback)) * 100
-            
         df_rets["max_ret"] = df_rets[close_cols].max(axis=1)
-        
         df_rets["Symbol_for_max_ret"] = df_rets[close_cols].idxmax(axis=1)
-        
         returns_dict[lookback] = df_rets
 
 
@@ -108,21 +101,17 @@ def main() -> None:
 
     ffdf = pd.DataFrame()
     maxi = 0
-    return_threshold = 
+    return_threshold = 0.8
     total_points = len(df_sel)
 
 
 
     for lookback in lookbacks:
-        
         df_rets = returns_dict[lookback]
         
         signals = np.full(total_points, "NIL", dtype=object)
-        
         orbs = 1000.0
-        
         holdings = 0.0
-        
         current_prod = "None"
 
         signals[:lookback] = "NIL"

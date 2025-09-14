@@ -108,7 +108,7 @@ def main() -> None:
 
     ffdf = pd.DataFrame()
     maxi = 0
-    return_threshold = 
+    return_threshold = 1.75
     total_points = len(df_sel)
 
 

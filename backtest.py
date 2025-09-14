@@ -54,7 +54,7 @@ def write_summary(summary_path: str, metrics: dict) -> None:
     lines = [
         f"final_value: {metrics['final_value']:.6f}",
         f"total_trades: {metrics['total_trades']}",
-        f"max_drawdown: {metrics['max_drawdown']:.3f}%",
+        f"max_drawdown: {metrics['max_drawdown']:.3f}",
         f"volatility: {metrics['volatility']:.6f}",
         f"sharpe: {metrics['sharpe']:.6f}",
     ]
