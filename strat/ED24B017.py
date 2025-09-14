@@ -1,86 +1,118 @@
-import pandas as pd
+# This is file where all the testing and other stuff happens.
+
+
 import numpy as np
+import pandas as pd
 
-# Load dataset
-df = pd.read_csv('data/input.csv')
 
-# Select CLOSE columns for momentum calculation
-close_cols = [col for col in df.columns if col.startswith('CLOSE_')]
-products = [col.replace('CLOSE_', '') for col in close_cols]
+master_df = pd.read_csv("/Users/aarya/Kaarthi/Code/Quant-Guild-Application-2025-Fall/data/input.csv")
 
-# Calculate 500-period percentage returns
-lookback = 500
-df_rets = df.iloc[500:].copy()  # t=501 to 5000
-for col in close_cols:
-    df_rets[f'Return_{col}'] = (df_rets[col] - df_rets[col].shift(lookback)) / df_rets[col].shift(lookback) * 100
 
-# Initialize portfolio
-orbs = 1000  # Starting ORBS
-current_product = None  # Held product
-holdings = 0  # Quantity of product
-signals = []  # Store signals
-return_threshold = 2  # Minimum return to buy (%)
 
-# Process t=1 to 500 (no trading, insufficient data)
-for t in range(500):
-    signals.append({'timestamp': df['timestamp'].iloc[t], 'signal': 'NIL'})
 
-# Process t=501 to 5000
-for t in df_rets.index:
-    timestamp = df_rets['timestamp'].iloc[t - 500]  # Adjust for iloc[500:]
+
+# ### Momentum: 
+# 
+# Okay, first we will be dealing with the momentum strat.
+# For this strat, first, we need to take in the first few rows to be not trading, or the lookback period. So, for the lookback period, there will be no trading to avoid losses. 
+# a entry in the time stamp indicates the end of day. so any trade must be done for the end of day price only. 
+# create a new df with 4 cols and 90% of rows consisting of % returns for each stock. then, find the maximum among the 4 stocks. add another col indicating whether we have money or stock in the account at that prev time stamp eod. 
+# 
+# for ex, if the previous day, we have sold all the stock, the prev stock should be hold and the present stock is money.
+# so, to take a decision, we look at the present day's status, and after taking the decision, we update the next day's status, since we cannot buy and sell at the same time. 
+# 
+# So, we cannot buy and sell at the same timestamp.
+# 
+# create a new df with 6 cols : ts, s1, s2, s3, s4, status. 
+# create a new ddf 2 cols : ts, trading_sig
+# this will be the final dataset to output. 
+# 
+# 
+
+
+df = master_df
+
+
+
+selected_cols = ["timestamp", "CLOSE_UNICORN_HORNS", "CLOSE_ELVEN_WINE", "CLOSE_VAMPIRE_BLOOD", "CLOSE_PHOENIX_FEATHERS"]
+df_sel = df[selected_cols]
+df_sel.columns = ["timestamp", "UNICORN_HORNS", "ELVEN_WINE", "VAMPIRE_BLOOD", "PHOENIX_FEATHERS"]
+
+
+# here, lets define the lookback. 
+
+results_df = []
+
+for lookback in range(10, 750, 10):
+    close_cols = df_sel.columns[1:]
+    df_rets = pd.DataFrame()
+    for col in close_cols:
+        df_rets[f'{col}'] = ((df_sel[col] - df_sel[col].shift(lookback)) / df_sel[col].shift(lookback)) * 100
+
+
+
+    df_rets["max_ret"] = df_rets[1:].max(axis=1)
+    ret_cols = close_cols
+    df_rets["Symbol_for_max_ret"] = df_rets[ret_cols].idxmax(axis=1)
+
+
+    orbs = 1000
+    holdings = 0
+    signals = []
+    total_points = len(df)
+    products = [col.replace('CLOSE_', '') for col in close_cols]
+    return_threshold = 1.5 # this should be changed to different values.
+
+    # for the lookback period, there will be no trading data. 
+
+    for t in range(lookback):
+        signals.append({"timestamp" : df_sel['timestamp'].iloc[t], 'signal' : "NIL"})
+
     
-    # Get max return and product
-    return_cols = [f'Return_{col}' for col in close_cols]
-    max_return = df_rets[return_cols].iloc[t - 500].fillna(-1000).max()
-    max_product_col = df_rets[return_cols].iloc[t - 500].fillna(-1000).idxmax()
-    max_product = max_product_col.replace('Return_CLOSE_', '') if pd.notna(max_product_col) else 'NIL'
+    current_prod = "None"
 
-    if t == df_rets.index[-1] and current_product:
-        # Final timestamp: sell to ORBS
-        sell_price = df_rets[f'CLOSE_{current_product}'].iloc[t - 500]
-        orbs += holdings * sell_price
-        signals.append({'timestamp': timestamp, 'signal': 'ORBS'})
-        current_product = None
-        holdings = 0
-    elif current_product:
-        # Check if current product's return is still #1
-        current_return = df_rets[f'Return_CLOSE_{current_product}'].iloc[t - 500]
-        if pd.isna(current_return):
-            current_return = -1000
-        if current_return < max_return:
-            # Sell current product, buy max return product if above threshold
-            sell_price = df_rets[f'CLOSE_{current_product}'].iloc[t - 500]
-            orbs += holdings * sell_price
-            current_product = None
-            holdings = 0
-            if max_return > return_threshold:
-                buy_price = df_rets[f'CLOSE_{max_product}'].iloc[t - 500]
-                holdings = orbs / buy_price
-                orbs = 0
-                current_product = max_product
-                signals.append({'timestamp': timestamp, 'signal': max_product})
-            else:
-                signals.append({'timestamp': timestamp, 'signal': 'ORBS'})
-        else:
-            # Hold current product
-            signals.append({'timestamp': timestamp, 'signal': 'NIL'})
-    else:
-        # Holding ORBS: buy max return product if above threshold
-        if max_return > return_threshold:
-            buy_price = df_rets[f'CLOSE_{max_product}'].iloc[t - 500]
-            holdings = orbs / buy_price
+    for t in range(lookback+1, total_points+1):
+        
+        timestamp = t
+        
+        df_max_ret = df_rets.at[t-1, 'max_ret']    
+        df_sym_for_max_ret = df_rets.at[t-1, 'Symbol_for_max_ret']
+        
+        signal = ''
+        
+        # all of them set. now logic. 
+        
+        # for the first iteration, we are not applying the minimum ratio concept here, 
+        # where the % ratio must be greater than a specified value. 
+        
+        if (orbs == 0):
+            # here we have some product in the portfolio already. 
+            if (current_prod != df_sym_for_max_ret and current_prod != "None"):
+                # here, the current product is gone from the top leaderboard, 
+                # therefore, we sell the current product.   
+                signal = "ORBS"
+                orbs = holdings * (df_sel.at[t-1, current_prod])   
+                current_prod = "None"
+                        
+            elif (current_prod == df_sym_for_max_ret):
+                current_prod = current_prod
+                signal = "NIL"
+                
+        else :
+            
+            signal = df_sym_for_max_ret
+            holdings = orbs/df_sel.at[t-1, signal]
             orbs = 0
-            current_product = max_product
-            signals.append({'timestamp': timestamp, 'signal': max_product})
-        else:
-            signals.append({'timestamp': timestamp, 'signal': 'NIL'})
+            current_prod = df_sym_for_max_ret
+        
+        signals.append({"timestamp" : t, 'signal' : signal})
 
-# Create signals DataFrame
-signals_df = pd.DataFrame(signals)
+    fdf = pd.DataFrame(signals)
+    fdf[['timestamp', 'signal']].to_csv(f'data/signals{lookback}.csv', index=False)
+    
+    
+    
 
-# Ensure all timestamps are included
-signals_df = signals_df.set_index('timestamp').reindex(df['timestamp']).reset_index()
-signals_df['signal'] = signals_df['signal'].fillna('NIL')
 
-# Save to signals.csv
-signals_df[['timestamp', 'signal']].to_csv('signals.csv', index=False)
+
+
